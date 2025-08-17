@@ -15,14 +15,18 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
 # --- Authorizing the use of API Key ---
-
-headers = {
-    "authorization": st.secrets["GROQ_API_KEY"]
-}
+# It's generally better to initialize the LLM once and pass it to functions
+# if the API key is always the same.
+llm = ChatGroq(
+    groq_api_key=st.secrets["GROQ_API_KEY"],
+    model="llama3-8b-8192",
+    temperature=0
+)
 
 # --- Caching Functions to Avoid Re-running Expensive Processes ---
 
-# Cache the function that loads and splits the document
+# This function is fine with @st.cache_data as its output only depends on the input file's content.
+# Streamlit's caching is smart enough to re-run this if the uploaded_file object changes.
 @st.cache_data
 def load_and_split_document(uploaded_file):
     """Loads a PDF from an uploaded file, saves it temporarily, and splits it."""
@@ -42,29 +46,23 @@ def load_and_split_document(uploaded_file):
     
     return doc_splits
 
-# Cache the function that creates the vector store for Q&A
-@st.cache_resource
-def create_vector_store(_doc_splits): # Underscore to signal it's a cached resource
+# We remove caching from these functions as they need to be re-run for each new document.
+# The expensive parts (loading/splitting and embedding creation) are handled elsewhere or are fast enough.
+def create_vector_store(doc_splits):
     """Creates a FAISS vector store from document splits."""
+    st.info("Creating vector store for Q&A...")
     embedding_model = HuggingFaceEmbeddings(
         model_name="all-MiniLM-L6-v2",
         model_kwargs={'device': 'cpu'}
     )
-    vector_store = FAISS.from_documents(_doc_splits, embedding_model)
+    vector_store = FAISS.from_documents(doc_splits, embedding_model)
     st.success("Vector store for Q&A is ready!")
     return vector_store
 
-# Cache the RAG chain creation
-@st.cache_resource
-def create_rag_chain(_vector_store):
+def create_rag_chain(vector_store, llm_instance):
     """Creates the retriever, reranker, and the full RAG chain for Q&A."""
     st.info("Setting up the RAG chain...")
-    llm = ChatGroq(
-        groq_api_key=st.secrets["GROQ_API_KEY"],
-        model="llama3-8b-8192",
-        temperature=0
-    )
-    retriever = _vector_store.as_retriever()
+    retriever = vector_store.as_retriever()
     cross_encoder_model = HuggingFaceCrossEncoder(
         model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
         model_kwargs={'device': 'cpu'}
@@ -86,21 +84,21 @@ def create_rag_chain(_vector_store):
         return "\n\n".join(doc.page_content for doc in docs)
     rag_chain = (
         {"context": compression_retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt | llm | StrOutputParser()
+        | prompt | llm_instance | StrOutputParser()
     )
     return rag_chain
 
-# Cache the Summarization chain creation
 @st.cache_resource
 def create_summarization_chain():
     """Creates a map-reduce summarization chain."""
     st.info("Setting up the Summarization chain...")
-    llm = ChatGroq(
+    # Using a slightly different temperature for summarization can be a good idea.
+    summarization_llm = ChatGroq(
         groq_api_key=st.secrets["GROQ_API_KEY"],
         model="llama3-8b-8192",
-        temperature=0.2 
+        temperature=0.2
     )
-    chain = load_summarize_chain(llm, chain_type="map_reduce")
+    chain = load_summarize_chain(summarization_llm, chain_type="map_reduce")
     st.success("Summarization chain is ready!")
     return chain
 
@@ -122,6 +120,18 @@ with st.sidebar:
 if not uploaded_file:
     st.info("Please upload a PDF document in the sidebar to begin.")
 else:
+    # Use session state to track the current file and clear cache if it changes.
+    if 'last_uploaded_file' not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
+        st.session_state.last_uploaded_file = uploaded_file.name
+        # Clear previous chat history when a new file is uploaded
+        if "messages" in st.session_state:
+            st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me anything about your new document."}]
+        # Clear any cached resources that depend on the file content.
+        # For more complex scenarios, you might need to clear specific caches.
+        st.cache_data.clear()
+        st.cache_resource.clear()
+
+
     # Process the document
     doc_splits = load_and_split_document(uploaded_file)
     
@@ -133,16 +143,15 @@ else:
     )
 
     if mode == "Q&A (Chat)":
-        # Create the vector store and RAG chain for Q&A
+        # These functions will now re-run for each new document because they are no longer cached.
         vector_store = create_vector_store(doc_splits)
-        rag_chain = create_rag_chain(vector_store)
+        rag_chain = create_rag_chain(vector_store, llm)
         
         st.header("Q&A with Your Document")
 
         # Initialize chat history
-        if "messages" not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
+        if "messages" not in st.session_state:
             st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me anything about your document."}]
-            st.session_state['file_name'] = uploaded_file.name # Track current file
 
         # Display chat messages
         for message in st.session_state.messages:
@@ -162,17 +171,11 @@ else:
             st.session_state.messages.append({"role": "assistant", "content": response})
 
     elif mode == "Summarization":
-        # Create the summarization chain
         summarize_chain = create_summarization_chain()
         
         st.header("Summarize Your Document")
         if st.button("Generate Summary"):
             with st.spinner("Generating summary... This can take some time for large documents."):
-                # The `invoke` method for this chain expects a dictionary with 'input_documents'
                 summary = summarize_chain.invoke({"input_documents": doc_splits})
                 st.subheader("Summary")
-
                 st.write(summary['output_text'])
-
-
-
