@@ -15,6 +15,7 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
 # --- Caching Functions to Avoid Re-running Expensive Processes ---
+"authorization": st.secrets["GROQ_API_KEY"]
 
 # Cache the function that loads and splits the document
 @st.cache_data
@@ -167,4 +168,5 @@ else:
                 st.subheader("Summary")
 
                 st.write(summary['output_text'])
+
 
