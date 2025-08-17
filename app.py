@@ -54,7 +54,7 @@ def create_rag_chain(_vector_store):
     """Creates the retriever, reranker, and the full RAG chain for Q&A."""
     st.info("Setting up the RAG chain...")
     llm = ChatGroq(
-        groq_api_key=st.secrets["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"],
+        groq_api_key=st.secrets["GROQ_API_KEY"],
         model="llama3-8b-8192",
         temperature=0
     )
@@ -167,3 +167,4 @@ else:
                 st.subheader("Summary")
 
                 st.write(summary['output_text'])
+
