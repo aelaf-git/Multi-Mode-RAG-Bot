@@ -1,6 +1,7 @@
 # 📚 Multi-Mode RAG Bot  
-🔗 **Live Deployment:** [Click Here to Try the App 🚀]([https://multi-mode-rag-bot-9hi4kdbx4c6pxbst6wcvxx.streamlit.app/])
-🔗 **Github Repository:** [Click Here to get the source code 🚀]([https://github.com/aelaf-git/Multi-Mode-RAG-Bot/])  
+## Made by Aelaf Eskindir
+🔗 **Live Deployment:** [Click Here to Try the App 🚀](https://multi-mode-rag-bot-9hi4kdbx4c6pxbst6wcvxx.streamlit.app/)
+🔗 **Github Repository:** [Click Here to get the source code 🚀](https://github.com/aelaf-git/Multi-Mode-RAG-Bot/)  
 
 ---
 
@@ -70,6 +71,8 @@ It integrates **LangChain**, **FAISS**, **HuggingFace embeddings**, and **Groq L
 
 - HuggingFace Transformers – Embeddings & reranker
 
+---
+
 ### 📌 Example Use Cases
 
 - 📚 Research papers → Summarize and Q&A
@@ -79,3 +82,4 @@ It integrates **LangChain**, **FAISS**, **HuggingFace embeddings**, and **Groq L
 - 🧑‍🎓 Study material → Summarize chapters or test knowledge
 
 - 📊 Reports → Fast insights
+
