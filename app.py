@@ -54,7 +54,7 @@ def create_rag_chain(_vector_store):
     """Creates the retriever, reranker, and the full RAG chain for Q&A."""
     st.info("Setting up the RAG chain...")
     llm = ChatGroq(
-        groq_api_key=st.secrets["GROQ_API_KEY"],
+        groq_api_key=st.secrets["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"],
         model="llama3-8b-8192",
         temperature=0
     )
@@ -165,4 +165,5 @@ else:
                 # The `invoke` method for this chain expects a dictionary with 'input_documents'
                 summary = summarize_chain.invoke({"input_documents": doc_splits})
                 st.subheader("Summary")
+
                 st.write(summary['output_text'])
